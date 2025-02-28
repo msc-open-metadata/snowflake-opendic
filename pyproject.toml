@@ -1,0 +1,24 @@
+[project]
+name = "snowflake-opendic"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "akongstad", email = "kongstad@outlook.com" },
+    { name = "carlbrr", email = "?@" },
+]
+requires-python = ">=3.13"
+dependencies = ["snowflake-connector-python>=3.13.2", "toml>=0.10.2"]
+
+[project.scripts]
+snowflake-opendic = "snowflake_opendic.cli:cli"
+
+[build-system]
+requires = ["uv>=0.6.3,<0.7"]
+build-backend = "uv"
+
+[dependency-groups]
+dev = ["pre-commit>=4.1.0"]
+
+[project.urls]
+Homepage = "https://github.com/msc-open-metadata/snowflake-opendic"
