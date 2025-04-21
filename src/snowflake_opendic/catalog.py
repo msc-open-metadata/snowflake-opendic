@@ -3,14 +3,14 @@ import pandas as pd
 import requests
 import snowflake.connector
 from snowflake_opendic.prettyResponse import PrettyResponse
-from snowflake_opendic.client import OpenDicClient  # If you want to call Polaris
-from snowflake_opendic.patterns.openDicPatterns import OpenDicPatterns  # Assuming this is the correct import path
+from snowflake_opendic.client import OpenDicClient
+from snowflake_opendic.patterns.openDicPatterns import OpenDicPatterns 
 
 class OpenDicSnowflakeCatalog:
     def __init__(self, config: dict, api_url: str):
         self.conn = snowflake.connector.connect(**config)
         self.cursor = self.conn.cursor()
-        self.client = OpenDicClient(api_url, config.get("token"))  # Optional, depends on your Polaris auth
+        self.client = OpenDicClient(api_url, config.get("token"))
         self._init_patterns()
 
     def _init_patterns(self):
@@ -62,8 +62,6 @@ class OpenDicSnowflakeCatalog:
                 platform = match.group("platform").lower()
                 response = self.client.get(f"/objects/{object_type}/platforms/{platform}/pull")
                 return self._pretty_print_result({"success": "Sync retrieved", "response": response})
-
-            # etc: define, create, drop, add_mapping...
 
             return self._pretty_print_result({"error": f"Unhandled OpenDic command: {command_type}"})
         
