@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 authors = [
     { name = "akongstad", email = "kongstad@outlook.com" },
-    { name = "carlbrr", email = "?@" },
+    { name = "carlbrr", email = "carl99@live.dk"},
 ]
 requires-python = ">=3.13"
 dependencies = ["snowflake-connector-python>=3.13.2", "toml>=0.10.2"]
@@ -14,8 +14,8 @@ dependencies = ["snowflake-connector-python>=3.13.2", "toml>=0.10.2"]
 snowflake-opendic = "snowflake_opendic.cli:cli"
 
 [build-system]
-requires = ["uv>=0.6.3,<0.7"]
-build-backend = "uv"
+requires = ["uv_build>=0.6.5,<0.7"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = ["pre-commit>=4.1.0"]
