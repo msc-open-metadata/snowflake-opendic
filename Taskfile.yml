@@ -1,7 +1,21 @@
-# https://taskfile.dev
-
 version: "3"
+
 tasks:
-  run:
+
+  init:pre-commit:
+    desc: Install pre-commit hooks
     cmds:
-      - uv run python -m snowflake_opendic.cli
+      - uv add pre-commit --dev
+      - uv run pre-commit install --hook-type commit-msg
+
+  build-package:
+    desc: Build the package
+    cmds:
+    - uv build
+
+  publish:pypy:
+    desc: publish package to pypy
+    dotenv: [".env"]
+    cmds:
+      - task build-package
+      - uv publish --token $PYPY_PAT
