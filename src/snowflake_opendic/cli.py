@@ -1,9 +1,8 @@
 import argparse
 
 import snowflake.connector
-import toml
 
-from .snow_opendic import connect, get_latency
+from .snow_opendic import get_latency, snowflake_connect
 
 
 def cli():
@@ -35,14 +34,3 @@ def cli():
     except Exception as e:
         print(f"Error connecting to snowflake: {e}")
         exit(1)
-
-
-def snowflake_connect(config_path=None):
-    if config_path is None:
-        print("Config file path not provided. Attempting default connection")
-        return snowflake.connector.connect()
-
-    with open(config_path, "r") as f:
-        config = toml.load(f)
-
-    return connect(config["snowflake_conf"])

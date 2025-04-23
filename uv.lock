@@ -412,7 +412,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/dc/17/5116a21c97acafd13
 
 [[package]]
 name = "snowflake-opendic"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "pandas" },
