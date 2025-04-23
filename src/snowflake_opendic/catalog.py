@@ -52,7 +52,7 @@ class OpenDicSnowflakeCatalog:
             match = re.match(pattern, sql_cleaned, flags)
             if match:
                 return self._handle_opendic_command(command_type, match)
-        return self.cursor.execute(sql_cleaned)
+        return pd.DataFrame(self.cursor.execute(sql_text).fetchall())
 
     def _handle_opendic_command(self, command_type: str, match: re.Match):
         try:
