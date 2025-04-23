@@ -16,17 +16,18 @@ from snowflake_opendic.model.openapi_models import (
     Statement,
     Udo,
 )
-from snowflake_opendic.patterns.openDicPatterns import OpenDicPatterns
-from snowflake_opendic.prettyResponse import PrettyResponse
-from snowflake_opendic.snow_opendic import snowflake_check_connection, snowflake_connect
+from snowflake_opendic.patterns.opendic_patterns import OpenDicPatterns
+from snowflake_opendic.pretty_pesponse import PrettyResponse
+from snowflake_opendic.snow_opendic import snowflake_check_connection
 
 
 class OpenDicSnowflakeCatalog:
-    def __init__(self, config_path: str | None, api_url: str, client_id: str, client_secret: str):
-        self.conn: SnowflakeConnection = snowflake_connect(config_path)
+    def __init__(self, snowflake_conn: SnowflakeConnection, api_url: str, client_id: str, client_secret: str):
+        self.conn: SnowflakeConnection = snowflake_conn
         snowflake_check_connection(self.conn)
         self.cursor: SnowflakeCursor = self.conn.cursor()
         self.client: OpenDicClient = OpenDicClient(api_url, f"{client_id}:{client_secret}")
+        self._init_patterns()
 
     def _init_patterns(self):
         self.opendic_patterns = {
