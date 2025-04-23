@@ -1,6 +1,6 @@
 [project]
 name = "snowflake-opendic"
-version = "0.1.9"
+version = "0.1.11"
 description = "Add your description here"
 readme = "README.md"
 authors = [
@@ -12,7 +12,7 @@ requires-python = ">=3.9"
 dependencies = [
     "pandas>=2.2.3",
     "pydantic>=2.11.3",
-    "snowflake-connector-python>=3.13.2",
+    "snowflake-connector-python[pandas]>=3.13.2",
     "toml>=0.10.2",
 ]
 

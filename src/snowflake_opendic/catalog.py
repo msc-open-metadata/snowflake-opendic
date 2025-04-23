@@ -5,7 +5,6 @@ import pandas as pd
 import requests
 from pydantic import ValidationError
 from snowflake.connector import SnowflakeConnection
-from snowflake.connector.cursor import SnowflakeCursor
 
 from snowflake_opendic.client import OpenDicClient
 from snowflake_opendic.model.openapi_models import (
@@ -25,7 +24,6 @@ class OpenDicSnowflakeCatalog:
     def __init__(self, snowflake_conn: SnowflakeConnection, api_url: str, client_id: str, client_secret: str):
         self.conn: SnowflakeConnection = snowflake_conn
         snowflake_check_connection(self.conn)
-        self.cursor: SnowflakeCursor = self.conn.cursor()
         self.client: OpenDicClient = OpenDicClient(api_url, f"{client_id}:{client_secret}")
         self._init_patterns()
 
@@ -52,7 +50,8 @@ class OpenDicSnowflakeCatalog:
             match = re.match(pattern, sql_cleaned, flags)
             if match:
                 return self._handle_opendic_command(command_type, match)
-        return pd.DataFrame(self.cursor.execute(sql_text).fetchall())
+        with self.conn.cursor() as cursor:
+            return cursor.execute(sql_text).fetchall()
 
     def _handle_opendic_command(self, command_type: str, match: re.Match):
         try:
@@ -172,7 +171,8 @@ class OpenDicSnowflakeCatalog:
             sql_text = statement.definition.strip()  # Extract SQL statement from the response
             if sql_text:
                 try:
-                    self.cursor.execute(sql_text)  # Execute the SQL statement
+                    with self.conn.cursor() as cursor:
+                        cursor.execute(sql_text)  # Execute the SQL statement
                     execution_results.append({"sql": sql_text, "status": "executed"})
                 except Exception as e:
                     execution_results.append({"sql": sql_text, "status": "failed", "error": str(e)})
@@ -212,10 +212,22 @@ class OpenDicSnowflakeCatalog:
         return {"success": "Data types validated successfully"}
 
     def _pretty_print_result(self, result: dict):
+        """
+        Pretty print the result in a readable format.
+        """
+        pd.set_option("display.width", None)  # Auto-detect terminal width
+        pd.set_option("display.max_colwidth", None)  # Show full content of each cell
+        pd.set_option("display.max_rows", None)  # Show all rows
+        pd.set_option("display.expand_frame_repr", False)  # Don't wrap to multiple lines
+
         response = result.get("response")
+
+        # Polaris-spec-compliant "good" responses, so objects or lists of objects
         if isinstance(response, list) and all(isinstance(item, dict) for item in response):
             return pd.DataFrame(response)
+
         elif isinstance(response, dict):
             return pd.DataFrame([response])
-        else:
-            return PrettyResponse(result)
+
+        # Everything else — errors, messages, etc.
+        return PrettyResponse(result)
