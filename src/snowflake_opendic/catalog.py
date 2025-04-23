@@ -1,13 +1,13 @@
 import json
 import re
-import pandas as pd
-from pydantic import ValidationError
-import requests
-import snowflake.connector
-from snowflake_opendic.prettyResponse import PrettyResponse
-from snowflake_opendic.client import OpenDicClient
-from snowflake_opendic.patterns.openDicPatterns import OpenDicPatterns 
 
+import pandas as pd
+import requests
+from pydantic import ValidationError
+from snowflake.connector import SnowflakeConnection
+from snowflake.connector.cursor import SnowflakeCursor
+
+from snowflake_opendic.client import OpenDicClient
 from snowflake_opendic.model.openapi_models import (
     CreatePlatformMappingRequest,
     CreateUdoRequest,
@@ -16,13 +16,17 @@ from snowflake_opendic.model.openapi_models import (
     Statement,
     Udo,
 )
+from snowflake_opendic.patterns.openDicPatterns import OpenDicPatterns
+from snowflake_opendic.prettyResponse import PrettyResponse
+from snowflake_opendic.snow_opendic import snowflake_check_connection, snowflake_connect
+
 
 class OpenDicSnowflakeCatalog:
-    def __init__(self, config: dict, api_url: str):
-        self.conn = snowflake.connector.connect(**config)
-        self.cursor = self.conn.cursor()
-        self.client = OpenDicClient(api_url, config.get("token"))
-        self._init_patterns()
+    def __init__(self, config_path: str | None, api_url: str, client_id: str, client_secret: str):
+        self.conn: SnowflakeConnection = snowflake_connect(config_path)
+        snowflake_check_connection(self.conn)
+        self.cursor: SnowflakeCursor = self.conn.cursor()
+        self.client: OpenDicClient = OpenDicClient(api_url, f"{client_id}:{client_secret}")
 
     def _init_patterns(self):
         self.opendic_patterns = {
@@ -48,7 +52,7 @@ class OpenDicSnowflakeCatalog:
             if match:
                 return self._handle_opendic_command(command_type, match)
         return self.cursor.execute(sql_cleaned)
-    
+
     def _handle_opendic_command(self, command_type: str, match: re.Match):
         try:
             if command_type == "create":
@@ -86,16 +90,10 @@ class OpenDicSnowflakeCatalog:
                 object_dump_map = json.loads(properties)
                 mapping_request = CreatePlatformMappingRequest(
                     platformMapping=PlatformMapping(
-                        typeName=object_type,
-                        platformName=platform,
-                        syntax=syntax,
-                        objectDumpMap=object_dump_map
+                        typeName=object_type, platformName=platform, syntax=syntax, objectDumpMap=object_dump_map
                     )
                 )
-                response = self.client.post(
-                    f"/objects/{object_type}/platforms/{platform}",
-                    mapping_request.model_dump()
-                )
+                response = self.client.post(f"/objects/{object_type}/platforms/{platform}", mapping_request.model_dump())
                 return self._pretty_print_result({"success": "Mapping added successfully", "response": response})
 
             elif command_type == "sync":
@@ -132,36 +130,27 @@ class OpenDicSnowflakeCatalog:
             elif command_type == "show_mappings_for_platform":
                 platform = match.group("platform")
                 response = self.client.get(f"/platforms/{platform}")
-                return self._pretty_print_result({"success": "Mappings for platform retrieved successfully", "response": response})
+                return self._pretty_print_result(
+                    {"success": "Mappings for platform retrieved successfully", "response": response}
+                )
 
             elif command_type == "drop_mapping_for_platform":
                 platform = match.group("platform")
                 response = self.client.delete(f"/platforms/{platform}")
                 return self._pretty_print_result({"success": "Platform's mappings dropped successfully", "response": response})
-            
+
             return self._pretty_print_result({"error": f"Unhandled OpenDic command: {command_type}"})
-        
+
         except json.JSONDecodeError as e:
-            return self._pretty_print_result({
-                "error": "Invalid JSON in PROPS",
-                "details": str(e)
-            })
+            return self._pretty_print_result({"error": "Invalid JSON in PROPS", "details": str(e)})
         except ValidationError as e:
-            return self._pretty_print_result({
-                "error": "Pydantic validation failed",
-                "details": str(e)
-            })
+            return self._pretty_print_result({"error": "Pydantic validation failed", "details": str(e)})
         except requests.exceptions.HTTPError as e:
-            return self._pretty_print_result({
-                "error": "HTTP Error",
-                "details": str(e),
-                "Catalog Response": e.response.json() if e.response else None
-            })
+            return self._pretty_print_result(
+                {"error": "HTTP Error", "details": str(e), "Catalog Response": e.response.json() if e.response else None}
+            )
         except Exception as e:
-            return self._pretty_print_result({
-                "error": "Unexpected error",
-                "details": str(e)
-            })
+            return self._pretty_print_result({"error": "Unexpected error", "details": str(e)})
 
     # Helper method to extract SQL statements from Polaris response and execute
     def _dump_handler(self, response: list[Statement]):
@@ -176,7 +165,7 @@ class OpenDicSnowflakeCatalog:
         """
         if not response:
             return self._pretty_print_result({"error": "No statements found in response"})
-        
+
         execution_results = []
         for statement in response:
             sql_text = statement.definition.strip()  # Extract SQL statement from the response
@@ -188,7 +177,7 @@ class OpenDicSnowflakeCatalog:
                     execution_results.append({"sql": sql_text, "status": "failed", "error": str(e)})
 
         return self._pretty_print_result({"success": True, "executions": execution_results})
-    
+
     def _validate_data_type(self, props: dict[str, str]) -> dict[str, str]:
         """
         Validate the data type against a predefined set of valid types.
@@ -200,14 +189,27 @@ class OpenDicSnowflakeCatalog:
             dict: A dictionary with the validation result.
         """
         # The same set of valid data types as in the OpenDic API - UserDefinedEntitySchema (+ int and double)
-        valid_data_types = {"string", "number", "boolean", "float", "date", "array", "list", "map", "object", "variant", "int", "double"}
+        valid_data_types = {
+            "string",
+            "number",
+            "boolean",
+            "float",
+            "date",
+            "array",
+            "list",
+            "map",
+            "object",
+            "variant",
+            "int",
+            "double",
+        }
 
         for key, value in props.items():
             if value.lower() not in valid_data_types:
                 raise ValueError(f"Invalid data type '{value}' for key '{key}'")
-            
+
         return {"success": "Data types validated successfully"}
-    
+
     def _pretty_print_result(self, result: dict):
         response = result.get("response")
         if isinstance(response, list) and all(isinstance(item, dict) for item in response):

@@ -7,7 +7,7 @@ authors = [
     { name = "akongstad", email = "kongstad@outlook.com" },
     { name = "carlbrr", email = "carl99@live.dk"},
 ]
-requires-python = ">=3.9"
+
 requires-python = ">=3.9"
 dependencies = [
     "pandas>=2.2.3",
