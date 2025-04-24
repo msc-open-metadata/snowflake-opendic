@@ -1,5 +1,7 @@
+import ast
 import json
 import re
+import textwrap
 
 import pandas as pd
 import requests
@@ -147,7 +149,7 @@ class OpenDicSnowflakeCatalog:
             return self._pretty_print_result({"error": "Unexpected error", "details": str(e)})
 
     # Helper method to extract SQL statements from Polaris response and execute
-    def _dump_handler(self, response: list[Statement]):
+    def dump_handler(self, response: list[Statement]):
         """
         Extracts SQL statements from the Polaris response and executes them using Spark.
 
@@ -158,20 +160,32 @@ class OpenDicSnowflakeCatalog:
             dict: Execution result with status.
         """
         if not response:
-            return self._pretty_print_result({"error": "No statements found in response"})
+            return self.pretty_print_result({"error": "No statements found in response"})
 
         execution_results = []
-        for statement in response:
-            sql_text = statement.definition.strip()  # Extract SQL statement from the response
-            if sql_text:
-                try:
-                    with self.conn.cursor() as cursor:
-                        cursor.execute(sql_text)  # Execute the SQL statement
-                    execution_results.append({"sql": sql_text, "status": "executed"})
-                except Exception as e:
-                    execution_results.append({"sql": sql_text, "status": "failed", "error": str(e)})
 
-        return self._pretty_print_result({"success": True, "executions": execution_results})
+        print(f"Executing {len(response)} SQL statements...\n")
+        for statement in response:
+            sql_text = statement.definition
+            
+            # Normalizes indentation (keep relative indents! - should work with the initial indentation of the SQL statement we discussed)
+            formatted_sql = textwrap.dedent(sql_text).strip()
+            print(f"Formatted SQL:\n{formatted_sql}")
+
+
+            # Wrap in triple quotes (this just shouldnt be necessary.. xd - outcomment this first, Andreas)
+            multiline_sql = f'''"""\n{formatted_sql}\n"""'''
+            print(f"Executing SQL (multilined SQL): \n{multiline_sql}")
+            # Execute
+            
+            try:
+                with self.conn.cursor() as cursor:
+                    cursor.execute(multiline_sql)  # Execute the SQL statement
+                execution_results.append({"sql": multiline_sql, "status": "executed"})
+            except Exception as e:
+                execution_results.append({"sql": multiline_sql, "status": "failed", "error": str(e)})
+
+        return self._pretty_print_result({"executions": execution_results})
 
     def _validate_data_type(self, props: dict[str, str]) -> dict[str, str]:
         """
