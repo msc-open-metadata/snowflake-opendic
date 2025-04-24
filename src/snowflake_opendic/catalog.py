@@ -25,31 +25,16 @@ class OpenDicSnowflakeCatalog:
         self.conn: SnowflakeConnection = snowflake_conn
         snowflake_check_connection(self.conn)
         self.client: OpenDicClient = OpenDicClient(api_url, f"{client_id}:{client_secret}")
-        self._init_patterns()
-
-    def _init_patterns(self):
-        self.opendic_patterns = {
-            "create": OpenDicPatterns.create_pattern(),
-            "define": OpenDicPatterns.define_pattern(),
-            "drop": OpenDicPatterns.drop_pattern(),
-            "add_mapping": OpenDicPatterns.add_mapping_pattern(),
-            "sync": OpenDicPatterns.sync_pattern(),
-            "show_types": OpenDicPatterns.show_types_pattern(),
-            "show": OpenDicPatterns.show_pattern(),
-            "show_platforms_all": OpenDicPatterns.show_platforms_all_pattern(),
-            "show_platforms_for_object": OpenDicPatterns.show_platforms_for_object_pattern(),
-            "show_mapping_for_object_and_platform": OpenDicPatterns.show_mapping_for_object_and_platform_pattern(),
-            "show_mappings_for_platform": OpenDicPatterns.show_mappings_for_platform_pattern(),
-            "drop_mapping_for_platform": OpenDicPatterns.drop_mapping_for_platform_pattern(),
-        }
+        self.opendic_patterns = OpenDicPatterns.compiled_patterns()
 
     def sql(self, sql_text: str):
         sql_cleaned = sql_text.strip()
-        for command_type, pattern in self.opendic_patterns.items():
-            flags = re.IGNORECASE | re.DOTALL if command_type == "add_mapping" else re.IGNORECASE
-            match = re.match(pattern, sql_cleaned, flags)
+        
+        for command_type, pattern in self.opendic_patterns:
+            match = pattern.match(sql_cleaned)
             if match:
-                return self._handle_opendic_command(command_type, match)
+                return self._handle_opendic_command(command_type, match, sql_text)
+            
         with self.conn.cursor() as cursor:
             return cursor.execute(sql_text).fetchall()
 
@@ -65,7 +50,16 @@ class OpenDicSnowflakeCatalog:
                 create_request = CreateUdoRequest(udo=udo)
                 response = self.client.post(f"/objects/{object_type}", create_request.model_dump())
                 return self._pretty_print_result({"success": "Object created successfully", "response": response})
-
+            elif command_type == "alter":
+                object_type = match.group("object_type")
+                name = match.group("name")
+                properties = match.group("properties")
+                alter_props: dict[str, str] = json.loads(properties) if properties else None        
+                udo_object = Udo(type=object_type, name=name, props=alter_props)
+                alter_request = CreateUdoRequest(udo=udo_object)
+                payload = alter_request.model_dump()
+                response = self.client.put(f"/objects/{object_type}/{name}", payload)
+                return self._pretty_print_result({"success": "Object altered successfully", "response": response})
             elif command_type == "define":
                 udoType = match.group("udoType")
                 properties = match.group("properties")
