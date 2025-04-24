@@ -33,7 +33,7 @@ class OpenDicSnowflakeCatalog:
         for command_type, pattern in self.opendic_patterns:
             match = pattern.match(sql_cleaned)
             if match:
-                return self._handle_opendic_command(command_type, match, sql_text)
+                return self._handle_opendic_command(command_type, match)
             
         with self.conn.cursor() as cursor:
             return cursor.execute(sql_text).fetchall()
