@@ -98,7 +98,12 @@ class OpenDicSnowflakeCatalog:
                 response = self.client.get(f"/objects/{object_type}/platforms/{platform}/pull")
                 statements = [Statement.model_validate(item) for item in response]
                 return self._dump_handler(statements)
-
+            elif command_type == "sync_all":
+                platform: str = match.group("platform").lower()
+                response = self.client.get(f"/platforms/{platform}/pull")
+                statements = [Statement.model_validate(item) for item in response]
+                return self.dump_handler(statements)
+            
             elif command_type == "show_types":
                 response = self.client.get("/objects")
                 return self._pretty_print_result({"success": "Object types retrieved successfully", "response": response})
