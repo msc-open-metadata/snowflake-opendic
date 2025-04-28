@@ -42,10 +42,12 @@ def snowflake_check_connection(conn: snowflake.connector.SnowflakeConnection):
     print(f"Connection Established | Server: {server} | Latency: {seconds} ✔︎")
 
 
-def snowflake_connect(config_path=None):
-    if config_path is None:
+def snowflake_connect(config_path: str = "None"):
+    if config_path == "None":
         print("Config file path not provided. Attempting default connection")
         return snowflake.connector.connect()
+    if config_path.split(".")[-1] != "toml":
+        raise ValueError("Config file must be in TOML format")
 
     with open(config_path, "r") as f:
         config = toml.load(f)
