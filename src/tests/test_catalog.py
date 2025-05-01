@@ -33,3 +33,14 @@ def test_show(mock_get, catalog):
 
     mock_get.assert_called_once_with("/objects/function")
     assert isinstance(response, PrettyResponse)
+
+@patch("snowflake_opendic.client.OpenDicClient.get")
+def test_sync(mock_get, catalog):
+    mock_get.return_value = [{"definition": "CREATE OR REPLACE FUNCTION my_function AS\n    'SELECT 1';"}]
+
+    query = "SYNC OPEN function for snowflake"
+
+    response = catalog.sql(query)
+
+    mock_get.assert_called_once_with("/objects/function/platforms/snowflake/pull")
+    assert isinstance(response, PrettyResponse)
