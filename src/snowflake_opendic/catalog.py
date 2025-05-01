@@ -1,7 +1,5 @@
-import ast
 import json
 import re
-import textwrap
 from typing import Any
 
 import pandas as pd
@@ -32,12 +30,12 @@ class OpenDicSnowflakeCatalog:
 
     def sql(self, sql_text: str):
         sql_cleaned = sql_text.strip()
-        
+
         for command_type, pattern in self.opendic_patterns:
             match = pattern.match(sql_cleaned)
             if match:
                 return self._handle_opendic_command(command_type, match)
-            
+
         with self.conn.cursor() as cursor:
             return cursor.execute(sql_text).fetchall()
 
@@ -64,12 +62,12 @@ class OpenDicSnowflakeCatalog:
                     udo_objects.append(udo_object)
 
                 response = self.client.post(f"/objects/{object_type}/batch", udo_objects)
-                return self.pretty_print_result({"success": "Batch created", "response": response})
+                return self._pretty_print_result({"success": "Batch created", "response": response})
             elif command_type == "alter":
                 object_type = match.group("object_type")
                 name = match.group("name")
                 properties = match.group("properties")
-                alter_props: dict[str, str] = json.loads(properties) if properties else None        
+                alter_props: dict[str, str] = json.loads(properties) if properties else None
                 udo_object = Udo(type=object_type, name=name, props=alter_props)
                 alter_request = CreateUdoRequest(udo=udo_object)
                 payload = alter_request.model_dump()
@@ -116,7 +114,7 @@ class OpenDicSnowflakeCatalog:
                 response = self.client.get(f"/platforms/{platform}/pull")
                 statements = [Statement.model_validate(item) for item in response]
                 return self.dump_handler(statements)
-            
+
             elif command_type == "show_types":
                 response = self.client.get("/objects")
                 return self._pretty_print_result({"success": "Object types retrieved successfully", "response": response})
@@ -178,30 +176,23 @@ class OpenDicSnowflakeCatalog:
             dict: Execution result with status.
         """
         if not response:
-            return self.pretty_print_result({"error": "No statements found in response"})
+            return self._pretty_print_result({"error": "No statements found in response"})
 
         execution_results = []
 
-        print(f"Executing {len(response)} SQL statements...\n")
         for statement in response:
             sql_text = statement.definition
-            
+
             # Normalizes indentation (keep relative indents! - should work with the initial indentation of the SQL statement we discussed)
-            formatted_sql = textwrap.dedent(sql_text).strip()
-            print(f"Formatted SQL:\n{formatted_sql}")
-
-
+            # formatted_sql = textwrap.dedent(sql_text).strip()
             # Wrap in triple quotes (this just shouldnt be necessary.. xd - outcomment this first, Andreas)
-            multiline_sql = f'''"""\n{formatted_sql}\n"""'''
-            print(f"Executing SQL (multilined SQL): \n{multiline_sql}")
-            # Execute
-            
+
             try:
                 with self.conn.cursor() as cursor:
-                    cursor.execute(multiline_sql)  # Execute the SQL statement
-                execution_results.append({"sql": multiline_sql, "status": "executed"})
+                    cursor.execute(sql_text)  # Execute the SQL statement
+                execution_results.append({"sql": sql_text, "status": "executed"})
             except Exception as e:
-                execution_results.append({"sql": multiline_sql, "status": "failed", "error": str(e)})
+                execution_results.append({"sql": sql_text, "status": "failed", "error": str(e)})
 
         return self._pretty_print_result({"executions": execution_results})
 
