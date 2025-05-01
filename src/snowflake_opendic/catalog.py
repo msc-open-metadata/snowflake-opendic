@@ -2,6 +2,7 @@ import ast
 import json
 import re
 import textwrap
+from typing import Any
 
 import pandas as pd
 import requests
@@ -52,6 +53,18 @@ class OpenDicSnowflakeCatalog:
                 create_request = CreateUdoRequest(udo=udo)
                 response = self.client.post(f"/objects/{object_type}", create_request.model_dump())
                 return self._pretty_print_result({"success": "Object created successfully", "response": response})
+            elif command_type == "create_batch":
+                object_type = match.group("object_type")
+                properties_list = json.loads(match.group("properties"))  # Already a list of dicts
+
+                udo_objects: list[dict[str, Any]] = []
+                for item in properties_list:
+                    name = item.pop("name")
+                    udo_object = Udo(type=object_type, name=name, props=item).model_dump()
+                    udo_objects.append(udo_object)
+
+                response = self.client.post(f"/objects/{object_type}/batch", udo_objects)
+                return self.pretty_print_result({"success": "Batch created", "response": response})
             elif command_type == "alter":
                 object_type = match.group("object_type")
                 name = match.group("name")
