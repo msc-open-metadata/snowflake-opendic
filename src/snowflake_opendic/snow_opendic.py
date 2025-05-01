@@ -1,3 +1,4 @@
+import warnings
 from datetime import datetime
 
 import snowflake.connector
@@ -37,7 +38,7 @@ def get_latency(conn: snowflake.connector.connection.SnowflakeConnection) -> tup
     return ((end_time - start_time).total_seconds(), fetch[0].tzinfo)  # type: ignore
 
 
-def snowflake_check_connection(conn: snowflake.connector.SnowflakeConnection):
+def snowflake_check_connection(conn: snowflake.connector.connection.SnowflakeConnection):
     seconds, server = get_latency(conn)
     print(f"Connection Established | Server: {server} | Latency: {seconds} ✔︎")
 
@@ -47,7 +48,7 @@ def snowflake_connect(config_path: str = "None"):
         print("Config file path not provided. Attempting default connection")
         return snowflake.connector.connect()
     if config_path.split(".")[-1] != "toml":
-        raise ValueError("Config file must be in TOML format")
+        warnings.warn("Config file must be in TOML format", RuntimeWarning)
 
     with open(config_path, "r") as f:
         config = toml.load(f)
