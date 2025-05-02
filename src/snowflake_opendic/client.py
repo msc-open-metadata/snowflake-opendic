@@ -17,7 +17,7 @@ class OpenDicClient:
         response.raise_for_status()  # Raise an exception if the response is not successful
         return response.json()
 
-    def get(self, endpoint: str) -> dict[str, Any]:
+    def get(self, endpoint: str):
         url: str = self.api_url + "/opendic/v1" + endpoint
         response: requests.Response = requests.get(url, headers={"Authorization": f"Bearer {self.oauth_token}"})
         response.raise_for_status()  # Raise an exception if the response is not successful
