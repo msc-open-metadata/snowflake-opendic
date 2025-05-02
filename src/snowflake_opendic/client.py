@@ -34,6 +34,9 @@ class OpenDicClient:
         response: requests.Response = requests.delete(url, headers={"Authorization": f"Bearer {self.oauth_token}"})
         response.raise_for_status()  # Raise an exception if the response is not successful
         return response.json()
+    
+    def refresh_oauth_token(self, credentials:str):
+        self.oauth_token = self.get_polaris_oauth_token(credentials)
 
     # Helper function to get the OAuth token
     def get_polaris_oauth_token(self, credentials: str) -> str:

@@ -25,6 +25,9 @@ from snowflake_opendic.snow_opendic import snowflake_check_connection
 
 class OpenDicSnowflakeCatalog:
     def __init__(self, snowflake_conn: SnowflakeConnection, api_url: str, client_id: str, client_secret: str):
+        self.api_url = api_url
+        self.client_id = client_id
+        self.client_secret = client_secret
         self.conn: SnowflakeConnection = snowflake_conn
         snowflake_check_connection(self.conn)
         self.client: OpenDicClient = OpenDicClient(api_url, f"{client_id}:{client_secret}")
@@ -36,12 +39,12 @@ class OpenDicSnowflakeCatalog:
         for command_type, pattern in self.opendic_patterns:
             match = pattern.match(sql_cleaned)
             if match:
-                return self._handle_opendic_command(command_type, match)
+                return self._handle_opendic_command(command_type, match, sql_text)
             
         with self.conn.cursor() as cursor:
             return cursor.execute(sql_text).fetchall()
 
-    def _handle_opendic_command(self, command_type: str, match: re.Match):
+    def _handle_opendic_command(self, command_type: str, match: re.Match, sql_text : str):
         try:
             if command_type == "create":
                 object_type = match.group("object_type")
@@ -160,9 +163,14 @@ class OpenDicSnowflakeCatalog:
         except ValidationError as e:
             return self._pretty_print_result({"error": "Pydantic validation failed", "details": str(e)})
         except requests.exceptions.HTTPError as e:
-            return self._pretty_print_result(
-                {"error": "HTTP Error", "details": str(e), "Catalog Response": e.response.json() if e.response else None}
-            )
+            # Check if httpcode is 401
+            if e.response.status_code == 401:
+                self.client.refresh_oauth_token(f"{self.client_id}:{self.client_secret}")
+                self.sql(sql_text)
+            else:
+                return self._pretty_print_result(
+                    {"error": "HTTP Error", "details": str(e), "Catalog Response": e.response.json() if e.response else None}
+                )
         except Exception as e:
             return self._pretty_print_result({"error": "Unexpected error", "details": str(e)})
 
