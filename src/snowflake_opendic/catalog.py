@@ -1,5 +1,6 @@
 import json
 import re
+import textwrap
 from typing import Any
 
 import pandas as pd
@@ -192,15 +193,15 @@ class OpenDicSnowflakeCatalog:
             sql_text = statement.definition
 
             # Normalizes indentation (keep relative indents! - should work with the initial indentation of the SQL statement we discussed)
-            # formatted_sql = textwrap.dedent(sql_text).strip()
-            # Wrap in triple quotes (this just shouldnt be necessary.. xd - outcomment this first, Andreas)
+            formatted_sql = textwrap.dedent(sql_text).strip()
+            
 
             try:
                 with self.conn.cursor() as cursor:
-                    cursor.execute(sql_text)  # Execute the SQL statement
-                execution_results.append({"sql": sql_text, "status": "executed"})
+                    cursor.execute(formatted_sql)  # Execute the SQL statement
+                execution_results.append({"sql": formatted_sql, "status": "executed"})
             except Exception as e:
-                execution_results.append({"sql": sql_text, "status": "failed", "error": str(e)})
+                execution_results.append({"sql": formatted_sql, "status": "failed", "error": str(e)})
 
         return self._pretty_print_result({"executions": execution_results})
 
