@@ -1,5 +1,6 @@
 import json
 import re
+import textwrap
 from typing import Any
 
 import pandas as pd
@@ -23,6 +24,9 @@ from snowflake_opendic.snow_opendic import snowflake_check_connection
 
 class OpenDicSnowflakeCatalog:
     def __init__(self, snowflake_conn: SnowflakeConnection, api_url: str, client_id: str, client_secret: str):
+        self.api_url = api_url
+        self.client_id = client_id
+        self.client_secret = client_secret
         self.conn: SnowflakeConnection = snowflake_conn
         snowflake_check_connection(self.conn)
         self.client: OpenDicClient = OpenDicClient(api_url, f"{client_id}:{client_secret}")
@@ -34,12 +38,12 @@ class OpenDicSnowflakeCatalog:
         for command_type, pattern in self.opendic_patterns:
             match = pattern.match(sql_cleaned)
             if match:
-                return self._handle_opendic_command(command_type, match)
-
+                return self._handle_opendic_command(command_type, match, sql_text)
+            
         with self.conn.cursor() as cursor:
             return cursor.execute(sql_text).fetchall()
 
-    def _handle_opendic_command(self, command_type: str, match: re.Match):
+    def _handle_opendic_command(self, command_type: str, match: re.Match, sql_text : str):
         try:
             if command_type == "create":
                 object_type = match.group("object_type")
@@ -158,9 +162,14 @@ class OpenDicSnowflakeCatalog:
         except ValidationError as e:
             return self._pretty_print_result({"error": "Pydantic validation failed", "details": str(e)})
         except requests.exceptions.HTTPError as e:
-            return self._pretty_print_result(
-                {"error": "HTTP Error", "details": str(e), "Catalog Response": e.response.json() if e.response else None}
-            )
+            # Check if httpcode is 401
+            if e.response.status_code == 401:
+                self.client.refresh_oauth_token(f"{self.client_id}:{self.client_secret}")
+                self.sql(sql_text)
+            else:
+                return self._pretty_print_result(
+                    {"error": "HTTP Error", "details": str(e), "Catalog Response": e.response.json() if e.response else None}
+                )
         except Exception as e:
             return self._pretty_print_result({"error": "Unexpected error", "details": str(e)})
 
@@ -184,15 +193,15 @@ class OpenDicSnowflakeCatalog:
             sql_text = statement.definition
 
             # Normalizes indentation (keep relative indents! - should work with the initial indentation of the SQL statement we discussed)
-            # formatted_sql = textwrap.dedent(sql_text).strip()
-            # Wrap in triple quotes (this just shouldnt be necessary.. xd - outcomment this first, Andreas)
+            formatted_sql = textwrap.dedent(sql_text).strip()
+            
 
             try:
                 with self.conn.cursor() as cursor:
-                    cursor.execute(sql_text)  # Execute the SQL statement
-                execution_results.append({"sql": sql_text, "status": "executed"})
+                    cursor.execute(formatted_sql)  # Execute the SQL statement
+                execution_results.append({"sql": formatted_sql, "status": "executed"})
             except Exception as e:
-                execution_results.append({"sql": sql_text, "status": "failed", "error": str(e)})
+                execution_results.append({"sql": formatted_sql, "status": "failed", "error": str(e)})
 
         return self._pretty_print_result({"executions": execution_results})
 

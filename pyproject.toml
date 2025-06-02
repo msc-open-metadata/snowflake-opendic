@@ -1,6 +1,6 @@
 [project]
 name = "snowflake-opendic"
-version = "0.1.21"
+version = "0.1.23"
 description = "Add your description here"
 readme = "README.md"
 authors = [
